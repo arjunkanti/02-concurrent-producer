@@ -1,0 +1,42 @@
+package io.classpath.kafka.examples.producer;
+
+import io.classpath.kafka.examples.config.AppConfig;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.IntegerSerializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.util.Properties;
+
+public class ProducerDemo {
+
+    private static final Logger logger = LogManager.getLogger();
+
+    public static void main(String[] args) {
+        Properties props = new Properties();
+        props.put(ProducerConfig.CLIENT_ID_CONFIG, AppConfig.applicationID);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, AppConfig.bootstrapServers);
+
+        KafkaProducer<Integer, String> producer = new KafkaProducer<>(props);
+
+        Thread[] dispatchers = new Thread[AppConfig.dataFiles.length];
+        logger.info("Starting Dispatcher threads...");
+        for (int i = 0; i < AppConfig.dataFiles.length; i++) {
+            dispatchers[i] = new Thread(new Executor(producer, AppConfig.topicName, AppConfig.dataFiles[i]));
+            dispatchers[i].start();
+        }
+
+        try {
+            for (Thread t : dispatchers) t.join();
+        } catch (InterruptedException e) {
+            logger.error("Main Thread Interrupted");
+        } finally {
+            producer.close();
+            logger.info("Finished Dispatcher Demo");
+        }
+    }
+}
